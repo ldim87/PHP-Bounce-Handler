@@ -7,6 +7,8 @@
 require_once("bounce_driver.class.php");
 $bouncehandler = new Bouncehandler();
 
+parse_str(implode('&', array_slice($argv, 1)), $_GET);
+
 if(!empty($_GET['testall'])){
     $files = get_sorted_file_list('eml');
     if (is_array($files)) {
@@ -23,7 +25,7 @@ if(!empty($_GET['testall'])){
             else{
                 print "<font color=red> - WRONG</font><br>\n";
                 print "<pre>\n";
-                print_r($multiArray[0]);
+                print_r($multiArray[0] ?? 'NO_ERR');
                 print "</pre>\n";
             }
        }
@@ -94,7 +96,7 @@ $bouncehandler->web_beacon_preg_2 = "/m=(\d*)/";
 $bouncehandler->x_header_search_1 = "X-ctnlist-suid";
 //$bouncehandler->x_header_search_2 = "X-sumthin-sumpin";
 
-if($_GET['eml']){
+if(isset($_GET['eml'])){
     echo "<HR><P><B>".$_GET['eml']."</B>  --  ";
     echo "<a href=\"testdriver1.php\">View a different bounce</a></P>";
     $bounce = file_get_contents("eml/".$_GET['eml']);

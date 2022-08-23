@@ -107,7 +107,7 @@ class BounceHandler{
         // parse the email into data structures
         $boundary = isset($this->head_hash['Content-type']['boundary']) ? $this->head_hash['Content-type']['boundary'] : '';
         $mime_sections = $this->parse_body_into_mime_sections($body, $boundary);
-        $this->body_hash = split("\r\n", $body);
+        $this->body_hash = explode("\r\n", $body);
         $this->first_body_hash = isset($mime_sections['first_body_part']) ? $this->parse_head($mime_sections['first_body_part']) : array();
 
         $this->looks_like_a_bounce = $this->is_a_bounce();
@@ -226,7 +226,7 @@ class BounceHandler{
             //  Busted Exim MTA
             //  Up to 50 email addresses can be listed on each header.
             //  There can be multiple X-Failed-Recipients: headers. - (not supported)
-            $arrFailed = split(',', $this->head_hash['X-failed-recipients']);
+            $arrFailed = explode(',', $this->head_hash['X-failed-recipients']);
             for($j=0; $j<count($arrFailed); $j++){
                 $this->output[$j]['recipient'] = trim($arrFailed[$j]);
                 $this->output[$j]['status'] = $this->get_status_code_from_text($this->output[$j]['recipient'],0);
@@ -418,7 +418,7 @@ class BounceHandler{
     function is_RFC1892_multipart_report(){
         return @$this->head_hash['Content-type']['type']=='multipart/report'
            &&  @$this->head_hash['Content-type']['report-type']=='delivery-status'
-           &&  @$this->head_hash['Content-type'][boundary]!=='';
+           &&  @$this->head_hash['Content-type']['boundary']!=='';
     }
 
     function parse_head($headers){
@@ -427,7 +427,7 @@ class BounceHandler{
         $hash = $this->standard_parser($headers);
         if(isset($hash['Content-type'])) {//preg_match('/Multipart\/Report/i', $hash['Content-type'])){
             $multipart_report = explode (';', $hash['Content-type']);
-            $hash['Content-type']='';
+            $hash['Content-type']=[];
             $hash['Content-type']['type'] = strtolower($multipart_report[0]);
             foreach($multipart_report as $mr){
                 if(preg_match('/([^=.]*?)=(.*)/i', $mr, $matches)){
@@ -455,7 +455,13 @@ class BounceHandler{
                         $line = substr($line, 0, -1);
                     else
                         $line .= "\r\n";
-                    $decoded .= preg_replace("/=([0-9A-F][0-9A-F])/e", 'chr(hexdec("$1"))', $line);
+                    $decoded .= preg_replace_callback(
+                        "/=([0-9A-F][0-9A-F])/",
+                        function($matches){
+                            chr(hexdec($matches[0]));
+                        },
+                        $line
+                    );
                 }
                 case 'base64': {
                     $decoded .= base64_decode($line);
@@ -504,7 +510,7 @@ class BounceHandler{
             }
             elseif (isset($line) && isset($entity) && preg_match('/^\s+(.+)\s*/', $line) && $entity) {
                 $line = trim($line);
-                if (strpos($array[2], '=?') !== FALSE)
+                if (isset($array[2]) && strpos($array[2], '=?') !== FALSE)
                     $line = iconv_mime_decode($array[2], ICONV_MIME_DECODE_CONTINUE_ON_ERROR, "UTF-8");
                 $hash[$entity] .= ' '. $line;
             }
@@ -522,13 +528,13 @@ class BounceHandler{
         $hash['per_message'] = isset($hash['per_message']) ? $this->standard_parser($hash['per_message']) : array();
         if(isset($hash['per_message']['X-postfix-sender'])){
             $arr = explode (';', $hash['per_message']['X-postfix-sender']);
-            $hash['per_message']['X-postfix-sender']='';
+            $hash['per_message']['X-postfix-sender']=[];
             $hash['per_message']['X-postfix-sender']['type'] = @trim($arr[0]);
             $hash['per_message']['X-postfix-sender']['addr'] = @trim($arr[1]);
         }
         if(isset($hash['per_message']['Reporting-mta'])){
             $arr = explode (';', $hash['per_message']['Reporting-mta']);
-            $hash['per_message']['Reporting-mta']='';
+            $hash['per_message']['Reporting-mta']=[];
             $hash['per_message']['Reporting-mta']['type'] = @trim($arr[0]);
             $hash['per_message']['Reporting-mta']['addr'] = @trim($arr[1]);
         }
@@ -631,7 +637,7 @@ class BounceHandler{
 
     // Take a line like "4.2.12 This is an error" and return  "4.2.12" and "This is an error"
     function format_status_code($code) {
-        $ret = "";
+        $ret = [];
         if(preg_match('/([245]\.[01234567]\.\d{1,2})\s*(.*)/', $code, $matches)) {
             $ret['code'] = $matches[1];
             $ret['text'] = $matches[2];
